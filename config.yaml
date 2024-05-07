@@ -1,0 +1,28 @@
+
+seed: 0
+# Log paths
+log_path: './logs'
+ckpt_path: './checkpoints'
+img_path: './plots'
+# Dataset
+data_path: 'sprites_1788_16x16.npy'
+batch_size: 64
+shuffle: True
+drop_last: True
+# Diffusion Params
+beta_start: 0.0001
+beta_end: 0.02
+steps: 1000
+color_channels: 3
+# U-Net Params
+in_ch: 3
+out_ch: 3
+time_dim: 256
+# Training
+lr: 0.0001
+num_epochs: 500
+image_size: 16
+num_images_to_sample: 32
+
+
+

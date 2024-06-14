@@ -3,22 +3,24 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class ResidualConv(nn.Module):
-    def __init__(self, in_ch, out_ch):
+class ConvBlock(nn.Module):
+    def __init__(self, in_ch, out_ch, use_residual=False):
         super().__init__()
         self.conv1 = nn.Conv2d(in_ch, out_ch//2, kernel_size=3, padding=1, bias=False)
         self.norm1 = nn.GroupNorm(1, out_ch//2)
         self.activation1 = nn.GELU()
         self.conv2 = nn.Conv2d(out_ch//2, out_ch, kernel_size=3, padding=1, bias=False)
-        self.activation2 = nn.GroupNorm(1, out_ch)
+        self.norm2 = nn.GroupNorm(1, out_ch)
+        self.use_residual = False
 
     def forward(self, x):
         out = self.conv1(x)
         out = self.norm1(out)
         out = self.activation1(out)
         out = self.conv2(out)
-        out = self.activation2(out)
-        out = F.gelu(out)
+        out = self.norm2(out)
+        if self.use_residual:
+            out = F.gelu(out + x)
         return out
 
 
@@ -49,7 +51,7 @@ class Down(nn.Module):
     def __init__(self, in_ch, out_ch, emb_dim=256):
         super().__init__()
         self.maxpool = nn.MaxPool2d(2)
-        self.resconv = ResidualConv(in_ch, out_ch)
+        self.conv = ConvBlock(in_ch, out_ch)
 
         self.time_emb = nn.Sequential(nn.SiLU(),
                                       nn.Linear(
@@ -60,7 +62,7 @@ class Down(nn.Module):
     
     def forward(self, x, t):
         x = self.maxpool(x)
-        x = self.resconv(x)
+        x = self.conv(x)
         emb = self.time_emb(t)[:, :, None, None].repeat(1, 1, x.shape[-2], x.shape[-1])
         return x+emb
     
@@ -69,7 +71,7 @@ class Up(nn.Module):
     def __init__(self, in_ch, out_ch, emb_dim=256):
         super().__init__()
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-        self.resconv = ResidualConv(in_ch, out_ch)
+        self.conv = ConvBlock(in_ch, out_ch)
         self.time_emb = nn.Sequential(nn.SiLU(),
                                       nn.Linear(
                                           emb_dim,
@@ -80,7 +82,7 @@ class Up(nn.Module):
     def forward(self, x, enc_x, t):
         x = self.upsample(x)
         x = torch.cat([enc_x, x], dim=1)
-        x = self.resconv(x)
+        x = self.conv(x)
         emb = self.time_emb(t)[:, :, None, None].repeat(1, 1, x.shape[-2], x.shape[-1])
         return x+emb
     
@@ -91,15 +93,15 @@ class UNet(nn.Module):
         self.device = device
         self.time_dim = time_dim
 
-        self.conv = ResidualConv(in_ch, 64)
+        self.conv = ConvBlock(in_ch, 64)
         self.down1 = Down(64, 128)
         self.attn1 = SelfAttention(128, 8)
         self.down2 = Down(128, 256)
         self.attn2 = SelfAttention(256, 4)
 
-        self.bot1 = ResidualConv(256, 512)
-        self.bot2 = ResidualConv(512, 512)
-        self.bot3 = ResidualConv(512, 256)
+        self.bot1 = ConvBlock(256, 512)
+        self.bot2 = ConvBlock(512, 512)
+        self.bot3 = ConvBlock(512, 256)
 
         self.up1 = Up(384, 128)
         self.attn3 = SelfAttention(128, 8)

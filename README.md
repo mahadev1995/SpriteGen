@@ -1,4 +1,5 @@
 # SpriteGen: A DDPM based Sprite Generator
+![spriteGen](https://github.com/user-attachments/assets/6d14eae5-8b65-41a5-bd30-cfd3384c22f1)
 
 This repository comprises the code for a simple 16x16 sprite generator that utilizes DDPM. The backward diffusion process uses an attention-based U-Net model as the denoising model. You can find the configs for training in the config.yaml file. The model is trained for 500 epochs with the MSE loss function. The loss curve over the epochs can be found below, along with the reconstructed images at different epochs. After training the model achieves an FID score of 38.65. The FID score is computed using 20,000 generated images and 20,000 random images from the training dataset.
 
